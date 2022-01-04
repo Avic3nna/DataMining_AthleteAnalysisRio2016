@@ -63,34 +63,66 @@ max(athletes_data$date_of_birth)
 mean((athletes_data$date_of_birth))
 hist(athletes_data$date_of_birth)
 
-athletes_data$date_of_birth = arules::discretize(athletes_data$date_of_birth, method = "cluster", labels = c('young', 'middle-aged', 'mature'))
+athletes_data$date_of_birth = cut(athletes_data$date_of_birth, c(15,20, 25, 30, 35, 40, 45, 50, 55, 60, 65,70))
 
-#rename to age_category instead of date of birth
-athletes_data = dplyr::rename(athletes_data, age_category = date_of_birth)
+#rename to age instead of date of birth
+athletes_data = dplyr::rename(athletes_data, age = date_of_birth)
 
 ## Height
 # tall for male and female have different meanings, and are therefore labelled
 # relative to the same gender. So 1.80 for male is considered average, but for a
 # female 1.80 is considered tall.
+hist(athletes_data$height)
 hist(athletes_data$height[athletes_data$sex == 'female'])
 hist(athletes_data$height[athletes_data$sex == 'male'])
 
-athletes_data$height[athletes_data$sex == 'female'] = arules::discretize(athletes_data$height[athletes_data$sex == 'female'], method = "cluster",labels = c('short_f', 'average_f', 'tall_f'))
-athletes_data$height[athletes_data$sex == 'male'] = arules::discretize(athletes_data$height[athletes_data$sex == 'male'], method = "cluster",labels = c('short_m', 'average_m', 'tall_m'))
+summary(athletes_data$height)
+athletes_data$height = cut(athletes_data$height, c(1.20,1.30,1.40, 1.50, 1.60, 1.70, 1.80, 1.90, 2.00, 2.10, 2.20))
 
-athletes_data$height = factor(athletes_data$height, levels = c(1, 2, 3), labels = c('short', 'average', 'tall'))
+# athletes_data$height[athletes_data$sex == 'female'] = arules::discretize(athletes_data$height[athletes_data$sex == 'female'], method = "cluster",labels = c('short_f', 'average_f', 'tall_f'))
+# athletes_data$height[athletes_data$sex == 'male'] = arules::discretize(athletes_data$height[athletes_data$sex == 'male'], method = "cluster",labels = c('short_m', 'average_m', 'tall_m'))
+# 
+# athletes_data$height = factor(athletes_data$height, levels = c(1, 2, 3), labels = c('short', 'average', 'tall'))
 
 ## Weight
 # heavy for male and female have different meanings, and are therefore labelled
 # relative to the same gender. So 80kg for male is considered average, but for a
 # female 80kg is considered heavy
-
+hist(athletes_data$weight)
 hist(athletes_data$weight[athletes_data$sex == 'female'])
 hist(athletes_data$weight[athletes_data$sex == 'male'])
 
-athletes_data$weight[athletes_data$sex == 'female'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'female'], method = "cluster",labels = c('light', 'average_f', 'heavy_f'))
-athletes_data$weight[athletes_data$sex == 'male'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'male'], method = "cluster",labels = c('light', 'average_m', 'heavy_m'))
+summary(athletes_data$weight)
 
-athletes_data$weight = factor(athletes_data$weight, levels = c(1, 2, 3), labels = c('light', 'average', 'heavy'))
+athletes_data$weight = cut(athletes_data$weight, c(30,40,50,60, 70, 80, 90, 100, 110, 120, 130, 140, 170))
+table(athletes_data$weight)
 
-## Podium position (sum gold,silver,bronze > 0)
+# athletes_data$weight[athletes_data$sex == 'female'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'female'], method = "cluster",labels = c('light', 'average_f', 'heavy_f'))
+# athletes_data$weight[athletes_data$sex == 'male'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'male'], method = "cluster",labels = c('light', 'average_m', 'heavy_m'))
+# 
+# athletes_data$weight = factor(athletes_data$weight, levels = c(1, 2, 3), labels = c('light', 'average', 'heavy'))
+
+
+## Podium position (has a medal)
+
+athletes_data$podium = as.integer((athletes_data$gold + athletes_data$silver + athletes_data$bronze) > 0)
+
+
+
+### Remove incomplete data rows
+athletes_data = na.omit(athletes_data)
+removed_rows = length(unique(attributes(athletes_data)$na.action))
+
+
+######### DATA EXPLORATION
+
+attach(athletes_data)
+
+### Choose X amount of sports you find most interesting and analyse/compare those
+table(sport)
+
+
+#########
+
+
+
