@@ -115,11 +115,52 @@ removed_rows = length(unique(attributes(athletes_data)$na.action))
 
 
 ######### DATA EXPLORATION
-
-attach(athletes_data)
-
 ### Choose X amount of sports you find most interesting and analyse/compare those
-table(sport)
+table(athletes_data$sport)
+
+
+#basketball, handball, volleyball, football, hockey, rugby
+#why: similar amount of athletes, similar amount of medals, all team ball sports
+
+winners = athletes_data[which(podium == 1 & sport %in% c('basketball', 'handball', 'volleyball',
+                                                'football', 'hockey', 'rugby sevens')),]
+
+losers = athletes_data[podium == 0 & sport %in% c('basketball', 'handball', 'volleyball',
+                                                'football', 'hockey', 'rugby sevens'),]
+table(winners$sport)
+
+par(mfrow=c(2,1))
+xx1 = barplot(prop.table(table(winners$height)) * 100, main = 'Winners height [%]', ylim = c(0,40))
+text(x = xx1, y = prop.table(table(winners$height)) * 100, labels = round(prop.table(table(winners$height)) * 100, 1),pos = 3, cex = 0.8, col = "red")
+
+xx2 = barplot(prop.table(table(losers$height)) * 100, main = 'Losers height [%]', ylim = c(0,40))
+text(x = xx2, y = prop.table(table(losers$height)) * 100, labels = round(prop.table(table(losers$height)) * 100, 1),pos = 3, cex = 0.8, col = "red")
+
+
+# 
+# par(mfrow=c(2,1))
+# xx1 = barplot(prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, main = 'Basketball winners height [%]', ylim = c(0,40))
+# text(x = xx1, y = prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, labels = round(prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, 1),pos = 3, cex = 0.8, col = "red")
+# 
+# xx2 = barplot(prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, main = 'Basketball losers height [%]', ylim = c(0,40))
+# text(x = xx2, y = prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, labels = round(prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, 1),pos = 3, cex = 0.8, col = "red")
+# 
+# 
+# par(mfrow=c(2,1))
+# barplot(prop.table(table(winners$height[winners$sport == 'handball'])) * 100, main = 'Handball winners height [%]', ylim = c(0,40))
+# barplot(prop.table(table(losers$height[losers$sport == 'handball'])) * 100, main = 'Handball losers height [%]', ylim = c(0,40))
+# 
+# par(mfrow=c(2,1))
+# barplot(prop.table(table(winners$height[winners$sport == 'volleyball'])) * 100, main = 'volleyball winners height [%]', ylim = c(0,40))
+# barplot(prop.table(table(losers$height[losers$sport == 'volleyball'])) * 100, main = 'volleyball losers height [%]', ylim = c(0,40))
+# 
+# barplot(table(winners$height[winners$sport == 'football']))
+# barplot(table(winners$height[winners$sport == 'hockey']))
+# barplot(table(winners$height[winners$sport == 'rugby sevens']))
+
+
+
+
 
 
 #########
