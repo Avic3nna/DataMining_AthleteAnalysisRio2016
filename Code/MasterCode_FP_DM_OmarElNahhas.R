@@ -7,7 +7,8 @@ set.seed(1337)
 
 packages_used = c("rstudioapi", 
                   "arules",
-                  "dplyr")
+                  "dplyr",
+                  "RColorBrewer")
 
 for(package in packages_used){
   if(package %in% rownames(installed.packages()) == FALSE) {
@@ -26,6 +27,7 @@ setwd_current_path()
 
 library(arules)
 library(dplyr)
+library(RColorBrewer)
 
 ######### BEGIN LOAD DATA
 athletes_data = read.csv("./Data/athletes.csv", header=T, as.is=T)
@@ -45,6 +47,8 @@ events_data = read.csv("./Data/events.csv", header=T, as.is=T)
 # find relations between an athlete's background, physical properties and their success in the sport
 # find relationships between sports: are some sports f.e. More skill based or more physical based?
 
+
+######### BEGIN DATA CLEANING
 ### Remove unused variables
 athletes_data <- subset(athletes_data, select = -c(id, name, info))
 
@@ -97,6 +101,7 @@ summary(athletes_data$weight)
 athletes_data$weight = cut(athletes_data$weight, c(30,40,50,60, 70, 80, 90, 100, 110, 120, 130, 140, 170))
 table(athletes_data$weight)
 
+#splitting men/women
 # athletes_data$weight[athletes_data$sex == 'female'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'female'], method = "cluster",labels = c('light', 'average_f', 'heavy_f'))
 # athletes_data$weight[athletes_data$sex == 'male'] = arules::discretize(athletes_data$weight[athletes_data$sex == 'male'], method = "cluster",labels = c('light', 'average_m', 'heavy_m'))
 # 
@@ -112,9 +117,11 @@ athletes_data$podium = as.integer((athletes_data$gold + athletes_data$silver + a
 ### Remove incomplete data rows
 athletes_data = na.omit(athletes_data)
 removed_rows = length(unique(attributes(athletes_data)$na.action))
+######### END DATA PRE-PROCESSING
 
 
-######### DATA EXPLORATION
+
+######### BEGIN DATA EXPLORATION
 ### Choose X amount of sports you find most interesting and analyse/compare those
 table(athletes_data$sport)
 
@@ -122,48 +129,73 @@ table(athletes_data$sport)
 #basketball, handball, volleyball, football, hockey, rugby
 #why: similar amount of athletes, similar amount of medals, all team ball sports
 
-winners = athletes_data[which(podium == 1 & sport %in% c('basketball', 'handball', 'volleyball',
+winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball',
                                                 'football', 'hockey', 'rugby sevens')),]
 
-losers = athletes_data[podium == 0 & sport %in% c('basketball', 'handball', 'volleyball',
+losers = athletes_data[athletes_data$podium == 0 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball',
                                                 'football', 'hockey', 'rugby sevens'),]
 table(winners$sport)
 
+# height comparison
 par(mfrow=c(2,1))
-xx1 = barplot(prop.table(table(winners$height)) * 100, main = 'Winners height [%]', ylim = c(0,40))
-text(x = xx1, y = prop.table(table(winners$height)) * 100, labels = round(prop.table(table(winners$height)) * 100, 1),pos = 3, cex = 0.8, col = "red")
+xx1 = barplot(prop.table(table(droplevels(winners$height))) * 100, main = 'Winners height [%]', ylim = c(0,40), col = 'green')
+text(x = xx1, y = prop.table(table(droplevels(winners$height))) * 100, labels = round(prop.table(table(droplevels(winners$height))) * 100, 1),pos = 3, cex = 0.8, col = "green")
 
-xx2 = barplot(prop.table(table(losers$height)) * 100, main = 'Losers height [%]', ylim = c(0,40))
-text(x = xx2, y = prop.table(table(losers$height)) * 100, labels = round(prop.table(table(losers$height)) * 100, 1),pos = 3, cex = 0.8, col = "red")
-
-
-# 
-# par(mfrow=c(2,1))
-# xx1 = barplot(prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, main = 'Basketball winners height [%]', ylim = c(0,40))
-# text(x = xx1, y = prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, labels = round(prop.table(table(winners$height[winners$sport == 'basketball'])) * 100, 1),pos = 3, cex = 0.8, col = "red")
-# 
-# xx2 = barplot(prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, main = 'Basketball losers height [%]', ylim = c(0,40))
-# text(x = xx2, y = prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, labels = round(prop.table(table(losers$height[losers$sport == 'basketball'])) * 100, 1),pos = 3, cex = 0.8, col = "red")
-# 
-# 
-# par(mfrow=c(2,1))
-# barplot(prop.table(table(winners$height[winners$sport == 'handball'])) * 100, main = 'Handball winners height [%]', ylim = c(0,40))
-# barplot(prop.table(table(losers$height[losers$sport == 'handball'])) * 100, main = 'Handball losers height [%]', ylim = c(0,40))
-# 
-# par(mfrow=c(2,1))
-# barplot(prop.table(table(winners$height[winners$sport == 'volleyball'])) * 100, main = 'volleyball winners height [%]', ylim = c(0,40))
-# barplot(prop.table(table(losers$height[losers$sport == 'volleyball'])) * 100, main = 'volleyball losers height [%]', ylim = c(0,40))
-# 
-# barplot(table(winners$height[winners$sport == 'football']))
-# barplot(table(winners$height[winners$sport == 'hockey']))
-# barplot(table(winners$height[winners$sport == 'rugby sevens']))
+xx2 = barplot(prop.table(table(droplevels(losers$height))) * 100, main = 'Losers height [%]', ylim = c(0,40), col = 'red')
+text(x = xx2, y = prop.table(table(droplevels(losers$height))) * 100, labels = round(prop.table(table(droplevels(losers$height))) * 100, 1),pos = 3, cex = 0.8, col = "red")
 
 
+# weight comparison
+par(mfrow=c(2,1))
+xx1 = barplot(prop.table(table(droplevels(winners$weight))) * 100, main = 'Winners weight [%]', ylim = c(0,40), col = 'green')
+text(x = xx1, y = prop.table(table(droplevels(winners$weight))) * 100, labels = round(prop.table(table(droplevels(winners$weight))) * 100, 1),pos = 3, cex = 0.8, col = "green")
+
+xx2 = barplot(prop.table(table(droplevels(losers$weight))) * 100, main = 'Losers weight [%]', ylim = c(0,40), col = 'red')
+text(x = xx2, y = prop.table(table(droplevels(losers$weight))) * 100, labels = round(prop.table(table(droplevels(losers$weight))) * 100, 1),pos = 3, cex = 0.8, col = "red")
+
+
+## check the winning countries
+table(droplevels(winners$nationality))
+
+# some countries send only a few athletes, while others send hundreds (US f.e.)
+# therefore, check the winners relative to the people that were sent
+country_names_win = names(table(droplevels(winners$nationality)))
+country_freq_win = unname(table(droplevels(winners$nationality)))
+
+country_freq_total = unname(table(droplevels(athletes_data$nationality))[country_names_win])
+
+relative_win_rate = round((country_freq_win/country_freq_total)*100,1)
+
+
+names(relative_win_rate) = country_names_win
+
+# plot relative win rate
+par(mfrow=c(2,1))
+
+col_pal = colorRampPalette(RColorBrewer::brewer.pal(n=8, 'Set2'))(length(table(droplevels(winners$nationality))))
+xx1 = barplot(relative_win_rate, col = col_pal, ylab = '%', main = 'Winners/participants per country [%]', ylim = c(0,40)) 
+text(x = xx1, y = relative_win_rate, labels = relative_win_rate, pos = 3, cex = 0.8, col = "black")
+
+
+wins = table(droplevels(winners$nationality))
+xx2 = barplot(wins, col = col_pal, ylab = 'Frequency', main = 'Winners per country', ylim = c(0,100)) 
+text(x = xx2, y = wins, labels = wins, pos = 3, cex = 0.8, col = "black")
+
+
+# add relative winrate per country as variable to learn from?
+
+######### END DATA EXPLORATION
 
 
 
+######### START DATA MODELLING
 
-#########
+# create a train/test set -> what is the dependent variable? Podium?
+# start with LR, basic model
+# proceed with clustering to find some underlying patterns
+# create a decision tree and assess
+
+######### END DATA MODELLING
 
 
 
