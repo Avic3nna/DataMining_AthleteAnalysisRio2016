@@ -8,7 +8,11 @@ set.seed(1337)
 packages_used = c("rstudioapi", 
                   "arules",
                   "dplyr",
-                  "RColorBrewer")
+                  "RColorBrewer",
+                  "stats",
+                  "rpart",
+                  "rpart.plot",
+                  "randomForest")
 
 for(package in packages_used){
   if(package %in% rownames(installed.packages()) == FALSE) {
@@ -28,6 +32,10 @@ setwd_current_path()
 library(arules)
 library(dplyr)
 library(RColorBrewer)
+library(stats)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
 
 ######### BEGIN LOAD DATA
 athletes_data = read.csv("./Data/athletes.csv", header=T, as.is=T)
@@ -66,6 +74,10 @@ min(athletes_data$date_of_birth)
 max(athletes_data$date_of_birth)
 mean((athletes_data$date_of_birth))
 hist(athletes_data$date_of_birth)
+
+#save non-discretized dataset
+
+athletes_data_nd = athletes_data
 
 athletes_data$date_of_birth = cut(athletes_data$date_of_birth, c(15,20, 25, 30, 35, 40, 45, 50, 55, 60, 65,70))
 
@@ -111,11 +123,11 @@ table(athletes_data$weight)
 ## Podium position (has a medal)
 
 athletes_data$podium = as.integer((athletes_data$gold + athletes_data$silver + athletes_data$bronze) > 0)
-
-
+athletes_data_nd$podium = as.integer((athletes_data$gold + athletes_data$silver + athletes_data$bronze) > 0)
 
 ### Remove incomplete data rows
 athletes_data = na.omit(athletes_data)
+athletes_data_nd = na.omit(athletes_data_nd)
 removed_rows = length(unique(attributes(athletes_data)$na.action))
 ######### END DATA PRE-PROCESSING
 
@@ -189,11 +201,136 @@ text(x = xx2, y = wins, labels = wins, pos = 3, cex = 0.8, col = "black")
 
 
 ######### START DATA MODELLING
+# join the winners / losers as 1 dataset
+# we want equal probability, thus equal split winners/losers (492/492)
+
+losers_equal_idx = sample(seq_len(nrow(losers)), size = nrow(winners))
+full_data = rbind(winners, losers[losers_equal_idx,])
 
 # create a train/test set -> what is the dependent variable? Podium?
-# start with LR, basic model
+# 80/20 split
+smp_size <- floor(0.8 * nrow(full_data))
+
+train_idx <- sample(seq_len(nrow(full_data)), size = smp_size)
+
+train <- full_data[train_idx, ]
+test <- full_data[-train_idx, ]
+
+### TEST SAMPLE IS A STATISTICAL REPRESENTATIVE OF TRAIN DATA :
+# podium places have similar mean + similar m/f ratio
+summary(train)
+summary(test)
+
+# visually similar distribution of age, height, weight
+par(mfrow=c(2,1))
+barplot(table(train$age), main = 'train age')
+barplot(table(test$age), main = 'test age')
+
+par(mfrow=c(2,1))
+barplot(table(train$height), main = 'train height')
+barplot(table(test$height), main = 'test height')
+
+par(mfrow=c(2,1))
+barplot(table(train$weight), main = 'train weight')
+barplot(table(test$weight), main = 'test weight')
+
+#nationalities differ, but this is an unavoidable phenomenon
+par(mfrow=c(2,1))
+barplot(table(droplevels(train$nationality)), main = 'train nationality')
+barplot(table(droplevels(test$nationality)), main = 'test nationality')
+
+# start with LR, basic model, try multiple independent vars
+simple_lr = stats::lm(podium ~ (height)**2 + weight + age, data = athletes_data_nd)
+summary(simple_lr)
+
+par(mfrow = c(2,2))
+plot(simple_lr)
+
+simple_lr_2 = stats::lm(podium ~ (nationality), data = full_data)
+summary(simple_lr_2)
+
+par(mfrow = c(2,2))
+plot(simple_lr_2)
+
+#conclusion: R^2 max at 0.36, many vars pval > 0.05
+#this problem cannot be solved by a linear model
+
 # proceed with clustering to find some underlying patterns
-# create a decision tree and assess
+### create a decision tree and assess
+
+dt_fit <- rpart(podium ~ . - gold - silver - bronze, data = train, method = 'class')
+rpart.plot(dt_fit)
+
+pred_dt <-predict(dt_fit, test, type = 'class')
+table_mat <- table(test$podium, pred_dt)
+table_mat
+
+acc_dt = sum(diag(table_mat))/sum(table_mat)
+#summary(dt_fit)
+
+
+acc_dt
+
+# = 84.2% acc
+
+### random forest
+#equalize so that train/test have same type of factors (capped at 53 for rf)
+
+train$podium = as.factor(train$podium)
+test$podium = as.factor(test$podium)
+
+train$nationality = droplevels(train$nationality)
+test$nationality = droplevels(test$nationality)
+
+xtrain = train
+xtest = test
+xtest <- rbind(xtrain[1, ] , xtest)
+xtest <- xtest[-1,]
+
+
+rf_fit <- randomForest::randomForest(podium ~ . - gold - silver - bronze, data = xtrain)
+rf_fit
+
+
+pred_rf <-predict(rf_fit, xtest, type = 'class')
+table_mat <- table(xtest$podium, pred_rf)
+table_mat
+
+acc_rf = sum(diag(table_mat))/sum(table_mat)
+
+acc_rf
+
+# = 87.8% accuracy
+
+
+####### how would I do in the olympics?
+nationality = "NED"
+sex = "male"
+age = "(20,25]"
+height = "(1.9,2]"
+weight = "(100,110]"
+sport = "basketball"
+
+omar_df = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
+                         'height' = height, 'weight' = weight, 'sport' = sport)
+
+xtrain = train
+xtest = test
+omar_df <- rbind(xtrain[1, 1:6] , omar_df)
+omar_df <- omar_df[-1,]
+
+omar_df[1,] = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
+                     'height' = height, 'weight' = weight, 'sport' = sport)
+
+rownames(omar_df) = "Omar"
+
+
+# Predictions with own data
+pred_dt <-predict(dt_fit, omar_df, type = 'class')
+pred_rf <-predict(rf_fit, omar_df, type = 'class')
+
+pred_dt
+pred_rf
 
 ######### END DATA MODELLING
 
