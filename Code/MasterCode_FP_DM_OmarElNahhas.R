@@ -141,11 +141,22 @@ table(athletes_data$sport)
 #basketball, handball, volleyball, football, hockey, rugby
 #why: similar amount of athletes, similar amount of medals, all team ball sports
 
-winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball',
-                                                'football', 'hockey', 'rugby sevens')),]
+winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
 
-losers = athletes_data[athletes_data$podium == 0 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball',
-                                                'football', 'hockey', 'rugby sevens'),]
+#winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
+#different sports, team sports may infer too big of correlation? 
+#c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')
+#c('boxing', 'tennis', 'weightlifting', 'judo', 'gymnastics', 'wrestling')
+#c('golf', 'fencing', 'weightlifting', 'shooting', 'archery', 'cycling')
+
+
+### Big conclusion: Choosing team sports is showing major bias,
+#   which explains why nationality is seen as the #1 variable
+#   if your fellow country people have won a medal in the same sport,
+#   and you are the same gender (i.e., you are on the same team)
+#   OF COURSE you will get the same outcome as your team
+
+losers = athletes_data[which(athletes_data$podium == 0 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
 table(winners$sport)
 
 # height comparison
@@ -259,7 +270,8 @@ plot(simple_lr_2)
 ### create a decision tree and assess
 
 dt_fit <- rpart(podium ~ . - gold - silver - bronze, data = train, method = 'class')
-rpart.plot(dt_fit)
+dt_fit = rpart::prune(dt_fit, cp = 0.01)
+rpart.plot(dt_fit, tweak = 1.5)
 
 pred_dt <-predict(dt_fit, test, type = 'class')
 table_mat <- table(test$podium, pred_dt)
@@ -271,7 +283,7 @@ acc_dt = sum(diag(table_mat))/sum(table_mat)
 
 acc_dt
 
-# = 84.2% acc
+# = 84.2% acc on test with group sports
 
 ### random forest
 #equalize so that train/test have same type of factors (capped at 53 for rf)
@@ -300,7 +312,7 @@ acc_rf = sum(diag(table_mat))/sum(table_mat)
 
 acc_rf
 
-# = 87.8% accuracy
+# = 87.8% accuracy on test with group sports
 
 
 ####### how would I do in the olympics?
@@ -312,15 +324,17 @@ weight = "(100,110]"
 sport = "basketball"
 
 omar_df = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
-                         'height' = height, 'weight' = weight, 'sport' = sport)
+                         'height' = height, 'weight' = weight, 'sport' = sport, 'gold' = 0,
+                     'silver' = 0, 'bronze' = 0, 'podium' = 0)
 
 xtrain = train
 xtest = test
-omar_df <- rbind(xtrain[1, 1:6] , omar_df)
+omar_df <- rbind(xtrain[1,] , omar_df)
 omar_df <- omar_df[-1,]
 
 omar_df[1,] = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
-                     'height' = height, 'weight' = weight, 'sport' = sport)
+                     'height' = height, 'weight' = weight, 'sport' = sport,'gold' = 0,
+                     'silver' = 0, 'bronze' = 0, 'podium' = 0)
 
 rownames(omar_df) = "Omar"
 
@@ -333,6 +347,18 @@ pred_dt
 pred_rf
 
 ######### END DATA MODELLING
+
+
+
+### TO-DO:
+# Select sports with individuals instead of teams
+# Choose countries with a higher representation (> x), the rest label as 'other'
+#    -> Maximum of 53 factors for RF due to computation limitation
+# Run dt/rf analysis again, draw conclusions (also with variable importance)
+# Choose 2 other methods (check notes again what exactly, clustering/outlier?)
+#    --> classification = predicting who wins based on the background ?
+#    --> clustering = showing typical physicalities per sport ?
+#    --> outlier detection = physical outlier, maybe skill based sport ?
 
 
 
