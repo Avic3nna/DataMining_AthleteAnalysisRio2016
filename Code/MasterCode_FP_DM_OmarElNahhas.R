@@ -12,7 +12,11 @@ packages_used = c("rstudioapi",
                   "stats",
                   "rpart",
                   "rpart.plot",
-                  "randomForest")
+                  "randomForest",
+                  "cluster",
+                  "rgl",
+                  "caret",
+                  "mixtools")
 
 for(package in packages_used){
   if(package %in% rownames(installed.packages()) == FALSE) {
@@ -36,6 +40,10 @@ library(stats)
 library(rpart)
 library(rpart.plot)
 library(randomForest)
+library(cluster)
+library(rgl)
+library(caret)
+library(mixtools)
 
 ######### BEGIN LOAD DATA
 athletes_data = read.csv("./Data/athletes.csv", header=T, as.is=T)
@@ -141,14 +149,19 @@ table(athletes_data$sport)
 #basketball, handball, volleyball, football, hockey, rugby
 #why: similar amount of athletes, similar amount of medals, all team ball sports
 
-winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
+winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('gymnastics', 'fencing', 'weightlifting', 'shooting', 'judo', 'cycling')),]
+
+#tennis, aquatics, archery
 
 #winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
-#different sports, team sports may infer too big of correlation? 
+#different sports, team sports may infer too big of correlation?
+
+
 #c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')
 #c('boxing', 'tennis', 'weightlifting', 'judo', 'gymnastics', 'wrestling')
 #c('golf', 'fencing', 'weightlifting', 'shooting', 'archery', 'cycling')
 
+#c('gymnastics', 'fencing', 'weightlifting', 'shooting', 'judo', 'cycling') -> similar amount of medals
 
 ### Big conclusion: Choosing team sports is showing major bias,
 #   which explains why nationality is seen as the #1 variable
@@ -156,8 +169,8 @@ winners = athletes_data[which(athletes_data$podium == 1 & athletes_data$sport %i
 #   and you are the same gender (i.e., you are on the same team)
 #   OF COURSE you will get the same outcome as your team
 
-losers = athletes_data[which(athletes_data$podium == 0 & athletes_data$sport %in% c('basketball', 'handball', 'volleyball','football', 'hockey', 'rugby sevens')),]
-table(winners$sport)
+losers = athletes_data[which(athletes_data$podium == 0 & athletes_data$sport %in% c('gymnastics', 'fencing', 'weightlifting', 'shooting', 'judo', 'cycling')),]
+table(droplevels(winners$sport))
 
 # height comparison
 par(mfrow=c(2,1))
@@ -213,10 +226,20 @@ text(x = xx2, y = wins, labels = wins, pos = 3, cex = 0.8, col = "black")
 
 ######### START DATA MODELLING
 # join the winners / losers as 1 dataset
-# we want equal probability, thus equal split winners/losers (492/492)
+# we want equal probability, thus equal split winners/losers
 
 losers_equal_idx = sample(seq_len(nrow(losers)), size = nrow(winners))
 full_data = rbind(winners, losers[losers_equal_idx,])
+
+
+#reduce categorical vars < 53 
+other_categ = names(which(table(droplevels(full_data$nationality)) < 4))
+other_idx = full_data$nationality %in% other_categ
+
+full_data$nationality = as.character(full_data$nationality)
+
+full_data$nationality[other_idx] = "OTHER"
+full_data$nationality = factor(full_data$nationality)
 
 # create a train/test set -> what is the dependent variable? Podium?
 # 80/20 split
@@ -226,6 +249,9 @@ train_idx <- sample(seq_len(nrow(full_data)), size = smp_size)
 
 train <- full_data[train_idx, ]
 test <- full_data[-train_idx, ]
+
+
+
 
 ### TEST SAMPLE IS A STATISTICAL REPRESENTATIVE OF TRAIN DATA :
 # podium places have similar mean + similar m/f ratio
@@ -251,7 +277,7 @@ barplot(table(droplevels(train$nationality)), main = 'train nationality')
 barplot(table(droplevels(test$nationality)), main = 'test nationality')
 
 # start with LR, basic model, try multiple independent vars
-simple_lr = stats::lm(podium ~ (height)**2 + weight + age, data = athletes_data_nd)
+simple_lr = stats::lm(podium ~ (height)**2 + weight, data = athletes_data_nd)
 summary(simple_lr)
 
 par(mfrow = c(2,2))
@@ -266,12 +292,14 @@ plot(simple_lr_2)
 #conclusion: R^2 max at 0.36, many vars pval > 0.05
 #this problem cannot be solved by a linear model
 
-# proceed with clustering to find some underlying patterns
+### proceed with clustering to find some underlying patterns
+
+
 ### create a decision tree and assess
 
-dt_fit <- rpart(podium ~ . - gold - silver - bronze, data = train, method = 'class')
+dt_fit <- rpart(podium ~ sex + age + height + weight + sport + nationality, data = train, method = 'class')
 dt_fit = rpart::prune(dt_fit, cp = 0.01)
-rpart.plot(dt_fit, tweak = 1.5)
+rpart.plot(dt_fit, tweak = 2)
 
 pred_dt <-predict(dt_fit, test, type = 'class')
 table_mat <- table(test$podium, pred_dt)
@@ -282,6 +310,8 @@ acc_dt = sum(diag(table_mat))/sum(table_mat)
 
 
 acc_dt
+
+dt_fit$variable.importance
 
 # = 84.2% acc on test with group sports
 
@@ -312,8 +342,57 @@ acc_rf = sum(diag(table_mat))/sum(table_mat)
 
 acc_rf
 
+rf_fit$importance
+
 # = 87.8% accuracy on test with group sports
 
+### Clustering
+full_data_unsupervised = athletes_data_nd[athletes_data_nd$sport %in% c('gymnastics', 'fencing', 'weightlifting', 'shooting', 'judo', 'cycling'), c(3,4,5,6)]
+full_data_unsupervised$sport = droplevels(full_data_unsupervised$sport)
+# showing true classes 3D
+rgl::plot3d(full_data_unsupervised$date_of_birth, full_data_unsupervised$weight, full_data_unsupervised$height, col = as.numeric(full_data_unsupervised$sport))
+rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = as.numeric(full_data_unsupervised$sport), cex=0.8, inset=c(0.02))
+
+
+kmeans_six = stats::kmeans(full_data_unsupervised[,1:3], centers = 6)
+
+
+
+# add cluster to original data 
+clustered_data <-cbind(full_data_unsupervised,as.factor(kmeans_six$cluster))
+
+clustered_data$cluster = levels(clustered_data$sport)[kmeans_six$cluster]
+
+clustered_data$cluster <- clustered_data$sport
+clustered_data$cluster[1:nrow(clustered_data)] <- levels(clustered_data$sport)[kmeans_six$cluster]
+
+
+sum(clustered_data$sport == clustered_data$cluster) #amount of correct clusters
+
+#rows = true, columns = predicted
+table(clustered_data$sport,clustered_data$cluster)
+
+#3rd party confmat
+caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
+#kmeans 13% acc
+
+
+rgl::plot3d(full_data_unsupervised$date_of_birth, full_data_unsupervised$weight, full_data_unsupervised$height, col = as.factor(kmeans_six$cluster))
+rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = as.factor(kmeans_six$cluster), cex=0.8, inset=c(0.02))
+
+hclusterini = stats::hclust(dist(full_data_unsupervised[,1:3]))
+clusterCut <- cutree(hclusterini, 6)
+
+
+clustered_data$cluster[1:nrow(clustered_data)] <- levels(clustered_data$sport)[clusterCut]
+
+caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
+#hierarch 20% acc
+
+
+### TO - DO: Draw conclusions regarding the clustering
+# which sports have similar physical features?
+# maybe better results when focussing only on winners? (more equal sample size)
 
 ####### how would I do in the olympics?
 nationality = "NED"
@@ -321,7 +400,7 @@ sex = "male"
 age = "(20,25]"
 height = "(1.9,2]"
 weight = "(100,110]"
-sport = "basketball"
+sport = "weightlifting"
 
 omar_df = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
                          'height' = height, 'weight' = weight, 'sport' = sport, 'gold' = 0,
