@@ -16,7 +16,8 @@ packages_used = c("rstudioapi",
                   "cluster",
                   "rgl",
                   "caret",
-                  "mixtools")
+                  "mixtools",
+                  "DMwR2")
 
 for(package in packages_used){
   if(package %in% rownames(installed.packages()) == FALSE) {
@@ -44,6 +45,7 @@ library(cluster)
 library(rgl)
 library(caret)
 library(mixtools)
+library(DMwR2)
 
 ######### BEGIN LOAD DATA
 athletes_data = read.csv("./Data/athletes.csv", header=T, as.is=T)
@@ -393,6 +395,66 @@ caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
 ### TO - DO: Draw conclusions regarding the clustering
 # which sports have similar physical features?
 # maybe better results when focussing only on winners? (more equal sample size)
+
+
+####### OUTLIER DETECTION
+#--> outlier detection = physical outlier, maybe skill based sport ?
+
+outlier_data = athletes_data_nd[athletes_data_nd$sport %in% c('gymnastics', 'canoe', 'weightlifting', 'shooting', 'basketball', 'table tennis'), c(3,4,5,6,7,8,9,10)]
+outlier_data$sport = droplevels(outlier_data$sport)
+
+
+
+outlier.scores = DMwR2::lofactor(outlier_data[,2:3], k=3)
+plot(density(na.omit(outlier.scores)))
+
+threshold_max = 3
+
+
+abline(v = threshold_max, col = 'red')
+
+
+
+
+outliers = outlier.scores[outlier.scores > threshold_max]
+outliers.ordered = order(outliers, decreasing = TRUE)
+
+relative_skill_vs_physical = table(outlier_data$sport[outliers])/table(outlier_data$sport)
+
+#Relatively speaking, these sports require more skill than physicality
+#because the outliers were sought on purely height/weight (physical parameters)
+#and the most outliers were found in the sports where skills > physicality
+#So 9.5% of all table tennis occurences were seen as physical outliers, meaning that
+#it is relative to the other sports way more skill based than physical based
+xx1 = barplot(sort(round(relative_skill_vs_physical*100,1), decreasing = TRUE), 
+        main = 'Outliers of sport physicality importance (relative frequency [%])', ylim = c(0,10), col = col_pal)
+
+text(x = xx1, y =sort(round(relative_skill_vs_physical*100,1), decreasing = TRUE), labels = unname(sort(round(relative_skill_vs_physical*100,1), decreasing = TRUE)),pos = 3, cex = 0.8, col = "black")
+
+full_outlier_profile = athletes_data_nd[outliers.ordered,]
+summary(full_outlier_profile)
+summary(outlier_data)
+
+# outlier profile show almost half of podium success as the entire pool
+
+## plotting the outliers
+n <- nrow(outlier_data)
+labels <- 1:n
+labels[-outliers.ordered] <- "."
+biplot(prcomp(outlier_data[,2:3]), cex=.8, xlabs=labels)
+
+
+pch <- rep(".", n)
+pch[outliers.ordered] <- "*"
+col <- rep("black", n)
+col[outliers.ordered] <- "red"
+
+rgl::plot3d(outlier_data$date_of_birth, 
+            outlier_data$height, outlier_data$weight,
+              pch=pch, col=col)
+pairs(outlier_data[,2:3], pch=pch, col=col)
+
+####### END OUTLIER DETECTION
 
 ####### how would I do in the olympics?
 nationality = "NED"
