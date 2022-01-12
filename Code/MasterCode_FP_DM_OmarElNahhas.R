@@ -17,7 +17,9 @@ packages_used = c("rstudioapi",
                   "rgl",
                   "caret",
                   "mixtools",
-                  "DMwR2")
+                  "DMwR2",
+                  "shiny",
+                  "randomcoloR")
 
 for(package in packages_used){
   if(package %in% rownames(installed.packages()) == FALSE) {
@@ -46,10 +48,14 @@ library(rgl)
 library(caret)
 library(mixtools)
 library(DMwR2)
+library(shiny)
+library(randomcoloR)
 
 ######### BEGIN LOAD DATA
 athletes_data = read.csv("./Data/athletes.csv", header=T, as.is=T)
 events_data = read.csv("./Data/events.csv", header=T, as.is=T)
+
+summary(athletes_data)
 ######### END LOAD DATA
 
 
@@ -299,7 +305,7 @@ plot(simple_lr_2)
 
 ### create a decision tree and assess
 
-dt_fit <- rpart(podium ~ sex + age + height + weight + sport + nationality, data = train, method = 'class')
+dt_fit <- rpart(podium ~ sex + age + height + weight + sport, data = train, method = 'class')
 dt_fit = rpart::prune(dt_fit, cp = 0.01)
 rpart.plot(dt_fit, tweak = 2)
 
@@ -310,7 +316,7 @@ table_mat
 acc_dt = sum(diag(table_mat))/sum(table_mat)
 #summary(dt_fit)
 
-
+caret::confusionMatrix(test$podium, pred_dt, mode = 'everything')
 acc_dt
 
 dt_fit$variable.importance
@@ -352,12 +358,24 @@ rf_fit$importance
 full_data_unsupervised = athletes_data_nd[athletes_data_nd$sport %in% c('gymnastics', 'fencing', 'weightlifting', 'shooting', 'judo', 'cycling'), c(3,4,5,6)]
 full_data_unsupervised$sport = droplevels(full_data_unsupervised$sport)
 # showing true classes 3D
-rgl::plot3d(full_data_unsupervised$date_of_birth, full_data_unsupervised$weight, full_data_unsupervised$height, col = as.numeric(full_data_unsupervised$sport))
-rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = as.numeric(full_data_unsupervised$sport), cex=0.8, inset=c(0.02))
+
+age = full_data_unsupervised$date_of_birth
+weight= full_data_unsupervised$weight
+height = full_data_unsupervised$height
+plotty = rgl::renderRglwidget({
+  rgl::plot3d(age, weight, height, col = palette(rainbow(6))[as.numeric(full_data_unsupervised$sport)])
+  rgl::par3d(windowRect = c(0, 0, 512, 512))
+  rgl::legend3d("topright", legend = unique(as.character(full_data_unsupervised$sport)), pch = 16, col = palette(rainbow(6)), cex=0.8, inset=c(0.02))
+  rgl::rglwidget()
+})
+plotty
+
+#rgl.snapshot( "gt_3dplot.png")
 
 
 kmeans_six = stats::kmeans(full_data_unsupervised[,1:3], centers = 6)
 
+plot(age, height, col = )
 
 
 # add cluster to original data 
@@ -376,11 +394,16 @@ table(clustered_data$sport,clustered_data$cluster)
 
 #3rd party confmat
 caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
-#kmeans 13% acc
+#kmeans 16% acc
 
 
-rgl::plot3d(full_data_unsupervised$date_of_birth, full_data_unsupervised$weight, full_data_unsupervised$height, col = as.factor(kmeans_six$cluster))
-rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = as.factor(kmeans_six$cluster), cex=0.8, inset=c(0.02))
+rgl::plot3d(age, weight, height, col = palette(rainbow(6))[as.factor(kmeans_six$cluster)])
+rgl::par3d(windowRect = c(0, 0, 512, 512))
+rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = palette(rainbow(6)), cex=0.8, inset=c(0.02))
+rgl::rglwidget()
+
+#rgl.snapshot( "kmeans_3dplot.png")
+
 
 hclusterini = stats::hclust(dist(full_data_unsupervised[,1:3]))
 clusterCut <- cutree(hclusterini, 6)
@@ -389,12 +412,18 @@ clusterCut <- cutree(hclusterini, 6)
 clustered_data$cluster[1:nrow(clustered_data)] <- levels(clustered_data$sport)[clusterCut]
 
 caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
-#hierarch 20% acc
+#hierarch 21% acc
 
+rgl::plot3d(age, weight, height, col = palette(rainbow(6))[as.factor(kmeans_six$cluster)])
+rgl::par3d(windowRect = c(0, 0, 512, 512))
+rgl::legend3d("topright", legend = unique(full_data_unsupervised$sport), pch = 16, col = palette(rainbow(6)), cex=0.8, inset=c(0.02))
+rgl::rglwidget()
+
+rgl.snapshot( "hiera_3dplot.png")
 
 ### TO - DO: Draw conclusions regarding the clustering
 # which sports have similar physical features?
-# maybe better results when focussing only on winners? (more equal sample size)
+# maybe better results when focusing only on winners? (more equal sample size)
 
 
 ####### OUTLIER DETECTION
@@ -406,7 +435,7 @@ outlier_data$sport = droplevels(outlier_data$sport)
 
 
 outlier.scores = DMwR2::lofactor(outlier_data[,2:3], k=3)
-plot(density(na.omit(outlier.scores)))
+plot(density(na.omit(outlier.scores)), main = 'Outlier density plot (outliers beyond red line)')
 
 threshold_max = 3
 
