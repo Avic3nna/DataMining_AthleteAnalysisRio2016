@@ -59,14 +59,6 @@ summary(athletes_data)
 ######### END LOAD DATA
 
 
-### To-do:
-# Determine the goals - why is this data analysed? 
-# Remove unused variables (id, name, nationality?)
-# Discretize the ages
-# Remove/impute samples without height/weight
-# Make a function which easily filters the dataset by wished for search queries
-
-
 ### Goals:
 # find relations between an athlete's background, physical properties and their success in the sport
 # find relationships between sports: are some sports f.e. More skill based or more physical based?
@@ -305,7 +297,7 @@ plot(simple_lr_2)
 
 ### create a decision tree and assess
 
-dt_fit <- rpart(podium ~ sex + age + height + weight + sport, data = train, method = 'class')
+dt_fit <- rpart(podium ~ sex + age + height + weight + sport + nationality, data = train, method = 'class')
 dt_fit = rpart::prune(dt_fit, cp = 0.01)
 rpart.plot(dt_fit, tweak = 2)
 
@@ -321,6 +313,7 @@ acc_dt
 
 dt_fit$variable.importance
 
+dt_fit_size = object.size(dt_fit)
 # = 84.2% acc on test with group sports
 
 ### random forest
@@ -411,6 +404,7 @@ clusterCut <- cutree(hclusterini, 6)
 
 clustered_data$cluster[1:nrow(clustered_data)] <- levels(clustered_data$sport)[clusterCut]
 
+table(clustered_data$sport, clustered_data$cluster)
 caret::confusionMatrix(clustered_data$cluster, clustered_data$sport)
 #hierarch 21% acc
 
@@ -491,7 +485,7 @@ sex = "male"
 age = "(20,25]"
 height = "(1.9,2]"
 weight = "(100,110]"
-sport = "weightlifting"
+sport = "basketball"
 
 omar_df = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
                          'height' = height, 'weight' = weight, 'sport' = sport, 'gold' = 0,
@@ -504,31 +498,22 @@ omar_df <- omar_df[-1,]
 
 omar_df[1,] = data.frame('nationality' = nationality, 'sex' = sex, 'age' = age, 
                      'height' = height, 'weight' = weight, 'sport' = sport,'gold' = 0,
-                     'silver' = 0, 'bronze' = 0, 'podium' = 0)
+                    'silver' = 0, 'bronze' = 0, 'podium' = 0)
 
-rownames(omar_df) = "Omar"
+rownames(omar_df) = "Omar" 
 
 
 # Predictions with own data
 pred_dt <-predict(dt_fit, omar_df, type = 'class')
-pred_rf <-predict(rf_fit, omar_df, type = 'class')
+
 
 pred_dt
-pred_rf
+
+# Not a podium place :(
+
 
 ######### END DATA MODELLING
 
-
-
-### TO-DO:
-# Select sports with individuals instead of teams
-# Choose countries with a higher representation (> x), the rest label as 'other'
-#    -> Maximum of 53 factors for RF due to computation limitation
-# Run dt/rf analysis again, draw conclusions (also with variable importance)
-# Choose 2 other methods (check notes again what exactly, clustering/outlier?)
-#    --> classification = predicting who wins based on the background ?
-#    --> clustering = showing typical physicalities per sport ?
-#    --> outlier detection = physical outlier, maybe skill based sport ?
 
 
 
